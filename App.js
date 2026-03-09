@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, Image, TouchableOpacity, Alert, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, View, Image, Pressable, Modal, SafeAreaView } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 
 const dados = [
@@ -42,6 +42,9 @@ export default function App() {
   const [points, setPoints] = useState(0);
   const [gameState, setGameState] = useState('home');
   const [isReady, setIsReady] = useState(false);
+
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertData, setAlertData] = useState({ title: '', message: '', isCorrect: false });
 
   useEffect(() => {
     async function setupDb() {
@@ -95,30 +98,31 @@ export default function App() {
   const handleAnswer = (selectedOption) => {
     const q = questions[currentQuestionIndex];
     const isCorrect = selectedOption === q.correctOption;
+
+    setAlertData({
+      title: isCorrect ? "Correto!" : "Incorreto!",
+      message: isCorrect
+        ? "Você acertou!"
+        : `Que pena, resposta errada. A certa era a opção ${q.correctOption}`,
+      isCorrect
+    });
+    setAlertVisible(true);
+  };
+
+  const closeAlertAndProceed = () => {
+    setAlertVisible(false);
+
+    if (alertData.isCorrect) setPoints(prev => prev + 1);
+
     const nextIndex = currentQuestionIndex + 1;
     const isLastQuestion = nextIndex >= questions.length;
 
-    Alert.alert(
-      isCorrect ? "Correto!" : "Incorreto!",
-      isCorrect
-        ? "Você acertou!"
-        : `Que pena, resposta errada. A certa era a opção ${q.correctOption}`,
-      [
-        {
-          text: "OK",
-          onPress: () => {
-            if (isCorrect) setPoints(prev => prev + 1);
-
-            if (isLastQuestion) {
-              setGameState('end');
-            } else {
-              setCurrentQuestionIndex(nextIndex);
-            }
-          }
-        }
-      ]
-    );
-  };
+    if (isLastQuestion) {
+      setGameState('end');
+    } else {
+      setCurrentQuestionIndex(nextIndex);
+    }
+  }
 
   if (!isReady) {
     return (
@@ -134,9 +138,12 @@ export default function App() {
         <View style={styles.homeView}>
           <Image source={require('./assets/quiz_main_image.png')} style={styles.coverImage} resizeMode="contain" />
           <Text style={styles.title}>Super Quiz!</Text>
-          <TouchableOpacity style={styles.button} onPress={startGame}>
+          <Pressable
+            style={({ pressed }) => [styles.button, { opacity: pressed ? 0.7 : 1 }]}
+            onPress={startGame}
+          >
             <Text style={styles.buttonText}>Começar Jogo</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       )}
 
@@ -147,13 +154,19 @@ export default function App() {
             <Text style={styles.questionText}>{questions[currentQuestionIndex].question}</Text>
           </View>
 
-          <TouchableOpacity style={styles.optionButton} onPress={() => handleAnswer(1)}>
+          <Pressable
+            style={({ pressed }) => [styles.optionButton, { opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }]}
+            onPress={() => handleAnswer(1)}
+          >
             <Text style={styles.optionText}>{questions[currentQuestionIndex].option1}</Text>
-          </TouchableOpacity>
+          </Pressable>
 
-          <TouchableOpacity style={styles.optionButton} onPress={() => handleAnswer(2)}>
+          <Pressable
+            style={({ pressed }) => [styles.optionButton, { opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }]}
+            onPress={() => handleAnswer(2)}
+          >
             <Text style={styles.optionText}>{questions[currentQuestionIndex].option2}</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       )}
 
@@ -162,14 +175,43 @@ export default function App() {
           <Image source={require('./assets/quiz_main_image.png')} style={styles.endImage} resizeMode="contain" />
           <Text style={styles.title}>Fim de Jogo!</Text>
           <Text style={styles.resultText}>Você acertou {points} de {questions.length} perguntas.</Text>
-          <TouchableOpacity style={styles.button} onPress={startGame}>
+          <Pressable
+            style={({ pressed }) => [styles.button, { opacity: pressed ? 0.7 : 1 }]}
+            onPress={startGame}
+          >
             <Text style={styles.buttonText}>Jogar Novamente</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, { backgroundColor: '#FF6B6B', marginTop: 15 }]} onPress={() => setGameState('home')}>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.button, { backgroundColor: '#FF6B6B', marginTop: 15, opacity: pressed ? 0.7 : 1 }]}
+            onPress={() => setGameState('home')}
+          >
             <Text style={styles.buttonText}>Voltar ao Menu Principal</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       )}
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={alertVisible}
+        onRequestClose={closeAlertAndProceed}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalView}>
+            <Text style={[styles.modalTitle, { color: alertData.isCorrect ? '#2ecc71' : '#e74c3c' }]}>
+              {alertData.title}
+            </Text>
+            <Text style={styles.modalMessage}>{alertData.message}</Text>
+            <Pressable
+              style={({ pressed }) => [styles.button, { backgroundColor: alertData.isCorrect ? '#2ecc71' : '#e74c3c', opacity: pressed ? 0.7 : 1 }]}
+              onPress={closeAlertAndProceed}
+            >
+              <Text style={styles.buttonText}>OK</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -200,5 +242,37 @@ const styles = StyleSheet.create({
   questionText: { fontSize: 22, fontWeight: 'bold', color: '#34495E', textAlign: 'center' },
   optionButton: { backgroundColor: '#FFFFFF', padding: 20, borderRadius: 10, marginBottom: 15, borderWidth: 2, borderColor: '#3498DB' },
   optionText: { fontSize: 18, color: '#2980B9', textAlign: 'center', fontWeight: '600' },
-  resultText: { fontSize: 22, color: '#2C3E50', marginBottom: 30, textAlign: 'center', fontWeight: '600' }
+  resultText: { fontSize: 22, color: '#2C3E50', marginBottom: 30, textAlign: 'center', fontWeight: '600' },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalView: {
+    margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 35,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    width: '80%',
+    maxWidth: 400
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    marginBottom: 25,
+    textAlign: 'center',
+    fontSize: 18,
+    color: '#34495E'
+  }
 });
